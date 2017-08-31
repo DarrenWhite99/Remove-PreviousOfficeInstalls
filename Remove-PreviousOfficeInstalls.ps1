@@ -1595,6 +1595,7 @@ function Check-FileReference(){
     )
 
     $defSourcePath='https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/'
+    $defSourcePath='https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/'
     $fDownload = $defSourcePath+$FName
     $fLocalName = $(GetScriptRoot)+'\'+$FName
 
