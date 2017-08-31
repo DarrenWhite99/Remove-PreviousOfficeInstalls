@@ -411,6 +411,8 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
                         }
 
+                        if($ActionFile) { Check-FileReference -Fname $ActionFile }
+
                         try{
                              if($ActionFile -And (Test-Path -Path $ActionFile)){
                                 $MainOfficeProductDisplayName = $MainOfficeProduct.DisplayName
@@ -470,6 +472,8 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
                         }
 
+                        if($ActionFile) { Check-FileReference -Fname $ActionFile }
+
                         if($ActionFile -And (Test-Path -Path $ActionFile)){
                             $cmdLine = """$ActionFile"" $VisioArgListProducts $argList"
                             $cmd = "cmd /c cscript //Nologo $cmdLine"
@@ -522,6 +526,9 @@ In this example the primary Office product will be removed even if it is Click-T
                                     }
                                 }
                             }
+
+                        if($ActionFile) { Check-FileReference -Fname $ActionFile }
+
                         if($ActionFile -And (Test-Path -Path $ActionFile)){
                             $cmdLine = """$ActionFile"" $ProjectProductName $argList"
                             $cmd = "cmd /c cscript //Nologo $cmdLine"
@@ -540,6 +547,7 @@ In this example the primary Office product will be removed even if it is Click-T
                         "11.*"{
                             if(!$office03Removed){
                                 $ActionFile = "$scriptPath\$03VBS"
+                                Check-FileReference -Fname $03VBS
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
                                 Invoke-Expression $cmd
@@ -549,6 +557,7 @@ In this example the primary Office product will be removed even if it is Click-T
                         "12.*"{
                             if(!$office07Removed){
                                 $ActionFile = "$scriptPath\$07VBS"
+                                Check-FileReference -Fname $07VBS
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
                                 Invoke-Expression $cmd
@@ -558,6 +567,7 @@ In this example the primary Office product will be removed even if it is Click-T
                         "14.*"{
                             if(!$office10Removed){
                                 $ActionFile = "$scriptPath\$10VBS"
+                                Check-FileReference -Fname $10VBS
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
                                 Invoke-Expression $cmd
@@ -568,9 +578,11 @@ In this example the primary Office product will be removed even if it is Click-T
                             if(!$office15Removed){
                                 if(!$c2r2013Installed){
                                     $ActionFile = "$scriptPath\$15MSIVBS"
+                                    Check-FileReference -Fname $15MSIVBS
                                 } else {
                                     if($RemoveClickToRunVersions){
                                         $ActionFile = "$scriptPath\$c2rVBS"
+                                        Check-FileReference -Fname $c2rVBS
                                     } else {
                                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office 2013 cannot be removed if 2013 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs." -LogFilePath $LogFilePath
                                         throw "Office 2013 cannot be removed if 2013 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs."
@@ -591,9 +603,11 @@ In this example the primary Office product will be removed even if it is Click-T
 
                                 if(!$c2r2016Installed){
                                     $ActionFile = "$scriptPath\$16MSIVBS"
+                                    Check-FileReference -Fname $16MSIVBS
                                 } else {
                                     if($RemoveClickToRunVersions){
                                         $ActionFile = "$scriptPath\$c2rVBS"  
+                                        Check-FileReference -Fname $c2rVBS
                                     } else {
                                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office 2016 cannot be removed if 2016 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs." -LogFilePath $LogFilePath
                                         throw "Office 2016 cannot be removed if 2016 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs."
@@ -1572,6 +1586,28 @@ function Get-CurrentLineNumber {
 
 function Get-CurrentFileName{
     $MyInvocation.ScriptName.Substring($MyInvocation.ScriptName.LastIndexOf("\")+1)
+}
+
+function Check-FileReference(){
+    param( 
+        [Parameter(Mandatory=$true)]
+        [string]$FName,
+    )
+
+    $defSourcePath='https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/'
+    $fDownload = $defSourcePath+$FName
+    $fLocalName = $(GetScriptRoot)+'\'+$FName
+
+    write-outut "I am looking for $($fName) at $($fLocalName)"
+    write-outut "I will download if needed from $($fDownload)"
+
+    If (!(Test-Path -Path $fLocalName)) {
+        try{
+#            (new-object Net.WebClient).DownloadFile($fDownload,$fLocalName)
+        } catch ( Write-Error "Something bad happened retrieving $($FName)" -ErrorAction Stop )
+    }
+    If (!(Test-Path -Path $fLocalName)) { Write-Output "$fLocalName exists!" }
+    Else { Write-Output "$fLocalName is missing!" }
 }
 
 Function WriteToLogFile() {
