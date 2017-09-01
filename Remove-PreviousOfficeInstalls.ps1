@@ -1,4 +1,5 @@
-﻿[CmdletBinding(SupportsShouldProcess=$true)]
+﻿
+[CmdletBinding(SupportsShouldProcess=$true)]
 param(
 [Parameter(ValueFromPipelineByPropertyName=$true)]
 [bool]$RemoveClickToRunVersions = $false,
@@ -20,6 +21,9 @@ param(
 
 [Parameter(ValueFromPipelineByPropertyName=$true)]
 [bool]$Quiet = $true,
+
+[Parameter(ValueFromPipelineByPropertyName=$true)]
+[string[]]$ScriptSource,
 
 [Parameter()]
 [ValidateSet("AllOfficeProducts","MainOfficeProduct","Visio","Project")]
@@ -176,6 +180,11 @@ the uninstall.
 By default the value is AllOfficeProducts which will remove all Office products. Set this value
 to MainOfficeProduct, Visio, and/or Project to only remove the specified product.
 
+.PARAMETER ScriptSource
+By default the value is:
+https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/
+This location will be used to download any additional files that are needed for Script Operations.
+
 .EXAMPLE
 Remove-PreviousOfficeInstalls
 In this example all Office products, except for click to run or 2016, will be removed.
@@ -214,6 +223,9 @@ In this example the primary Office product will be removed even if it is Click-T
     [bool]$Quiet = $true,
 
     [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [string[]]$ScriptSource,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
     [ValidateSet("AllOfficeProducts","MainOfficeProduct","Visio","Project")]
     [string[]]$ProductsToRemove = "AllOfficeProducts",
 
@@ -221,9 +233,15 @@ In this example the primary Office product will be removed even if it is Click-T
     [string]$LogFilePath
   )
 
+
   Process {
+    If (!($ScriptSource) -or $ScriptSource -like  '') {
+        $ScriptSource = 'https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/'
+        $ScriptSource = 'https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/'
+    }
+      
     $currentFileName = Get-CurrentFileName
-    Set-Alias -name LINENUM -value Get-CurrentLineNumber
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
     $c2rVBS = "OffScrubc2r.vbs"
     $03VBS = "OffScrub03.vbs"
@@ -241,7 +259,7 @@ In this example the primary Office product will be removed even if it is Click-T
 
     [bool]$isVisioC2R = $false
     [bool]$isProjectC2R = $false
-   
+
     if($ProductsToRemove -eq 'AllOfficeProducts'){
         $argListProducts += "CLIENTALL"
     } else {       
@@ -411,7 +429,7 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
                         }
 
-                        if($ActionFile) { Check-FileReference -Fname $ActionFile }
+                        if($ActionFile) { Get-FileReference -Fname $ActionFile -ScriptSource $ScriptSource }
 
                         try{
                              if($ActionFile -And (Test-Path -Path $ActionFile)){
@@ -472,7 +490,7 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
                         }
 
-                        if($ActionFile) { Check-FileReference -Fname $ActionFile }
+                        if($ActionFile) { Get-FileReference -Fname $ActionFile -ScriptSource $ScriptSource }
 
                         if($ActionFile -And (Test-Path -Path $ActionFile)){
                             $cmdLine = """$ActionFile"" $VisioArgListProducts $argList"
@@ -527,7 +545,7 @@ In this example the primary Office product will be removed even if it is Click-T
                                 }
                             }
 
-                        if($ActionFile) { Check-FileReference -Fname $ActionFile }
+                        if($ActionFile) { Get-FileReference -Fname $ActionFile -ScriptSource $ScriptSource }
 
                         if($ActionFile -And (Test-Path -Path $ActionFile)){
                             $cmdLine = """$ActionFile"" $ProjectProductName $argList"
@@ -547,7 +565,7 @@ In this example the primary Office product will be removed even if it is Click-T
                         "11.*"{
                             if(!$office03Removed){
                                 $ActionFile = "$scriptPath\$03VBS"
-                                Check-FileReference -Fname $03VBS
+                                Get-FileReference -Fname $03VBS -ScriptSource $ScriptSource
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
                                 Invoke-Expression $cmd
@@ -557,7 +575,7 @@ In this example the primary Office product will be removed even if it is Click-T
                         "12.*"{
                             if(!$office07Removed){
                                 $ActionFile = "$scriptPath\$07VBS"
-                                Check-FileReference -Fname $07VBS
+                                Get-FileReference -Fname $07VBS -ScriptSource $ScriptSource
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
                                 Invoke-Expression $cmd
@@ -567,7 +585,7 @@ In this example the primary Office product will be removed even if it is Click-T
                         "14.*"{
                             if(!$office10Removed){
                                 $ActionFile = "$scriptPath\$10VBS"
-                                Check-FileReference -Fname $10VBS
+                                Get-FileReference -Fname $10VBS -ScriptSource $ScriptSource
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
                                 Invoke-Expression $cmd
@@ -578,11 +596,11 @@ In this example the primary Office product will be removed even if it is Click-T
                             if(!$office15Removed){
                                 if(!$c2r2013Installed){
                                     $ActionFile = "$scriptPath\$15MSIVBS"
-                                    Check-FileReference -Fname $15MSIVBS
+                                    Get-FileReference -Fname $15MSIVBS -ScriptSource $ScriptSource
                                 } else {
                                     if($RemoveClickToRunVersions){
                                         $ActionFile = "$scriptPath\$c2rVBS"
-                                        Check-FileReference -Fname $c2rVBS
+                                        Get-FileReference -Fname $c2rVBS -ScriptSource $ScriptSource
                                     } else {
                                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office 2013 cannot be removed if 2013 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs." -LogFilePath $LogFilePath
                                         throw "Office 2013 cannot be removed if 2013 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs."
@@ -603,11 +621,11 @@ In this example the primary Office product will be removed even if it is Click-T
 
                                 if(!$c2r2016Installed){
                                     $ActionFile = "$scriptPath\$16MSIVBS"
-                                    Check-FileReference -Fname $16MSIVBS
+                                    Get-FileReference -Fname $16MSIVBS -ScriptSource $ScriptSource
                                 } else {
                                     if($RemoveClickToRunVersions){
                                         $ActionFile = "$scriptPath\$c2rVBS"  
-                                        Check-FileReference -Fname $c2rVBS
+                                        Get-FileReference -Fname $c2rVBS -ScriptSource $ScriptSource
                                     } else {
                                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office 2016 cannot be removed if 2016 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs." -LogFilePath $LogFilePath
                                         throw "Office 2016 cannot be removed if 2016 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs."
@@ -670,7 +688,7 @@ Will uninstall Office Click-to-Run.
 
      Process{
         $currentFileName = Get-CurrentFileName
-        Set-Alias -name LINENUM -value Get-CurrentLineNumber 
+        Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False 
 
         $scriptRoot = GetScriptRoot
 
@@ -807,7 +825,7 @@ Function StartProcess {
 	)
 
     $currentFileName = Get-CurrentFileName
-    Set-Alias -name LINENUM -value Get-CurrentLineNumber 
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False 
 
     Try
     {
@@ -842,7 +860,7 @@ Function IsSupportedLanguage() {
         )
         
         $currentFileName = Get-CurrentFileName
-        Set-Alias -name LINENUM -value Get-CurrentLineNumber
+        Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
         $lang = $validLanguages | where {$_.ToString().ToUpper().EndsWith("|$Language".ToUpper())}
           
@@ -1263,7 +1281,7 @@ Function IsDotSourced() {
   if ($cmdLine -match '^\.\\') {
      $dotSourced = $false
   } else {
-     $dotSourced = ($cmdLine -match '^\.')
+     $dotSourced = ($cmdLine -match '^\.|^&[\{ ]+\.')
   }
 
   return $dotSourced
@@ -1297,7 +1315,7 @@ param(
     $results = New-Object PSObject[] 0;
     
     $currentFileName = Get-CurrentFileName
-    Set-Alias -name LINENUM -value Get-CurrentLineNumber
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
     if($ProductName -eq 'MainOfficeProduct'){
         $MainOfficeProducts = @()
@@ -1585,30 +1603,37 @@ function Get-CurrentLineNumber {
 }
 
 function Get-CurrentFileName{
-    $MyInvocation.ScriptName.Substring($MyInvocation.ScriptName.LastIndexOf("\")+1)
+    $FName=($MyInvocation.ScriptName.Substring($MyInvocation.ScriptName.LastIndexOf("\")+1))
+    if (!($FName)) {$FName='Remove-PreviousOfficeInstalls - Dynamic Mode'}
+    return $FName
 }
 
-function Check-FileReference(){
+function Get-FileReference(){
     param( 
         [Parameter(Mandatory=$true)]
         [string]$FName,
+        [Parameter(Mandatory=$true)]
+        [string[]]$ScriptSource
     )
 
-    $defSourcePath='https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/'
-    $defSourcePath='https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/'
-    $fDownload = $defSourcePath+$FName
     $fLocalName = $(GetScriptRoot)+'\'+$FName
-
-    write-outut "I am looking for $($fName) at $($fLocalName)"
-    write-outut "I will download if needed from $($fDownload)"
-
-    If (!(Test-Path -Path $fLocalName)) {
-        try{
-#            (new-object Net.WebClient).DownloadFile($fDownload,$fLocalName)
-        } catch ( Write-Error "Something bad happened retrieving $($FName)" -ErrorAction Stop )
-    }
-    If (!(Test-Path -Path $fLocalName)) { Write-Output "$fLocalName exists!" }
-    Else { Write-Output "$fLocalName is missing!" }
+    try{
+        ForEach ($sSource in $ScriptSource) {
+            If (!(Test-Path -Path $fLocalName -EA 0)) {
+               IF ($sSource -match '^https?://') { 
+                    try {
+                        (new-object Net.WebClient).DownloadFile("$($sSource+$FName)",$fLocalName)
+                        Write-Verbose "Download succeeded for $($sSource+$FName)"
+                    } catch { Write-Verbose "Download failed for $($sSource+$FName)" } 
+                } ElseIf ((Test-Path -Path "$($sSource)")) { 
+                    try {
+                        Copy-Item -Path "$($sSource+$FName)" -Destination $fLocalName -Force -EA 1
+                        Write-Verbose "Copy succeeded for $($sSource+$FName)"
+                    } catch { Write-Verbose "Copy failed for $($sSource+$FName)" } 
+                }
+            }
+        }
+    } catch { Write-Error "Something bad happened retrieving $($FName)" -ErrorAction Stop }
 }
 
 Function WriteToLogFile() {
@@ -1646,7 +1671,8 @@ Function WriteToLogFile() {
 }
 
 $dotSourced = IsDotSourced -InvocationLine $MyInvocation.Line
+$currentFileName = Get-CurrentFileName
 
-if (!($dotSourced)) {
-   Remove-PreviousOfficeInstalls -RemoveClickToRunVersions $RemoveClickToRunVersions -Remove2016Installs $Remove2016Installs -Force $Force -KeepUserSettings $KeepUserSettings -KeepLync $KeepLync -NoReboot $NoReboot -ProductsToRemove $ProductsToRemove -LogFilePath $LogFilePath
+if (!($dotSourced) -and ($currentFileName) -and !($currentFileName -like '*Dynamic Mode*')) {
+    Remove-PreviousOfficeInstalls -RemoveClickToRunVersions $RemoveClickToRunVersions -Remove2016Installs $Remove2016Installs -Force $Force -KeepUserSettings $KeepUserSettings -KeepLync $KeepLync -NoReboot $NoReboot -ProductsToRemove $ProductsToRemove -LogFilePath $LogFilePath -ScriptSource $ScriptSource
 }
