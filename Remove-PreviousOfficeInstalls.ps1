@@ -146,7 +146,7 @@ $validLanguages = @(
 "Wolof (Senegal)|wo-sn",
 "Yoruba (Nigeria)|yo-ng")
 
-Function Remove-PreviousOfficeInstalls{
+Function Remove-PreviousOfficeInstalls {
 <#
 .SYNOPSIS
 Automate the process to remove Office products.
@@ -644,10 +644,10 @@ In this example the primary Office product will be removed even if it is Click-T
             }
         }
     }
-  }
-  if (($cleanupFileReferences)) {
-    $cleanupFileReferences | foreach-object { if ((Test-Path -Path $_ -EA 0)) { Remove-Item -path $_ -Force -EA 0 } }
-    $global:cleanupFileReferences = @()
+    if (($cleanupFileReferences)) {
+        $cleanupFileReferences | foreach-object { if ((Test-Path -Path $_ -EA 0)) { Remove-Item -path $_ -Force -EA 0 } }
+        $global:cleanupFileReferences = @()
+    }
   }
 }
 
@@ -1404,7 +1404,7 @@ function Get-ODTOfficeProductLanguages {
 
     Begin {
         $defaultDisplaySet = 'DisplayName','Languages'
-        $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet(‘DefaultDisplayPropertySet’,[string[]]$defaultDisplaySet)
+        $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultDisplaySet)
         $PSStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
         $results = New-Object PSObject[] 0
     }
