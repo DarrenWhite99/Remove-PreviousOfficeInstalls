@@ -1,4 +1,4 @@
-﻿
+
 [CmdletBinding(SupportsShouldProcess=$true)]
 param(
 [Parameter(ValueFromPipelineByPropertyName=$true)]
@@ -236,10 +236,11 @@ In this example the primary Office product will be removed even if it is Click-T
 
   Process {
     If (!($ScriptSource) -or $ScriptSource -like  '') {
-        $ScriptSource = 'https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/'
-        $ScriptSource = 'https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/'
+        $ScriptSource = @('https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/',
+			'https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/')
     }
-      
+    $ScriptSource = ($ScriptSource) -replace '(?<=^(?=https?://).+(?<!/))(/*)$','/' -replace '(?<=^(?!https?://).+(?<![\\]))([\\]*)$','\'
+
     $currentFileName = Get-CurrentFileName
     Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
@@ -643,6 +644,10 @@ In this example the primary Office product will be removed even if it is Click-T
             }
         }
     }
+  }
+  if (($cleanupFileReferences)) {
+    $cleanupFileReferences | foreach-object { if ((Test-Path -Path $_ -EA 0)) { Remove-Item -path $_ -Force -EA 0 } }
+    $global:cleanupFileReferences = @()
   }
 }
 
@@ -1288,17 +1293,19 @@ Function IsDotSourced() {
 }
 
 Function GetScriptRoot() {
- process {
-     [string]$scriptPath = "."
+    process {
+        [string]$scriptPath = "."
 
-     if ($PSScriptRoot) {
-       $scriptPath = $PSScriptRoot
-     } else {
-       $scriptPath = (Get-Item -Path ".\").FullName
-     }
+        if ($overrideScriptPath) {
+            $scriptPath = $PSScriptRoot
+        } elseif ($PSScriptRoot) {
+            $scriptPath = $PSScriptRoot
+        } else {
+            $scriptPath = (Get-Item -Path ".\").FullName
+        }
 
-     return $scriptPath
- }
+        return $scriptPath
+    }
 }
 
 function GetProductName {
@@ -1604,7 +1611,23 @@ function Get-CurrentLineNumber {
 
 function Get-CurrentFileName{
     $FName=($MyInvocation.ScriptName.Substring($MyInvocation.ScriptName.LastIndexOf("\")+1))
-    if (!($FName)) {$FName='Remove-PreviousOfficeInstalls - Dynamic Mode'}
+    if (!($FName)) {
+        $FName='Remove-PreviousOfficeInstalls - Dynamic Mode'
+        $global:overrideScriptPath=Get-Location|Select-Object -ExpandProperty Path
+        if (!($ScriptSource) -or (($ScriptSource) -and ($ScriptSource -notmatch 'https?://'))) {
+            #Need to try and extract URL from Invocation Information
+            #$MyInvocation.MyCommand
+        }
+        try {
+            Set-Location -Path "$($env:temp)" -EA 1
+            $global:overrideScriptPath=Get-Location|Select-Object -ExpandProperty Path
+        } catch {
+            try {
+                Set-Location -Path "$($env:windir)\temp" -EA 1
+                $global:overrideScriptPath=Get-Location|Select-Object -ExpandProperty Path
+            } catch {}
+        }
+    }
     return $FName
 }
 
@@ -1620,14 +1643,17 @@ function Get-FileReference(){
     try{
         ForEach ($sSource in $ScriptSource) {
             If (!(Test-Path -Path $fLocalName -EA 0)) {
-               IF ($sSource -match '^https?://') { 
+                IF (!($cleanupFileReferences)) { $global:cleanupFileReferences = @() }
+                IF ($sSource -match '^https?://') { 
                     try {
                         (new-object Net.WebClient).DownloadFile("$($sSource+$FName)",$fLocalName)
+                        $global:cleanupFileReferences += $fLocalName
                         Write-Verbose "Download succeeded for $($sSource+$FName)"
                     } catch { Write-Verbose "Download failed for $($sSource+$FName)" } 
                 } ElseIf ((Test-Path -Path "$($sSource)")) { 
                     try {
                         Copy-Item -Path "$($sSource+$FName)" -Destination $fLocalName -Force -EA 1
+                        $global:cleanupFileReferences += $fLocalName
                         Write-Verbose "Copy succeeded for $($sSource+$FName)"
                     } catch { Write-Verbose "Copy failed for $($sSource+$FName)" } 
                 }
