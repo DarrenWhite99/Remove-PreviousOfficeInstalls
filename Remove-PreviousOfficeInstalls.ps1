@@ -710,12 +710,16 @@ In this example the primary Office product will be removed even if it is Click-T
                     }
 
                     if($cmd) {
-                        if ($repairCMDs -contains $cmd) {
+                        $cmd = "$cmd"
+                        if (($repairCMDs) -and ($repairCMDs -contains $cmd.ToUpper())) {
                             WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repair command has already been executed for a different product. Skipping Repair..." -LogFilePath $LogFilePath
-                            $repairCMDs += $cmd
                         } else {
-                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repairing Office Product $($product.DisplayName) with command: $($cmd)..." -LogFilePath $LogFilePath
-                            Invoke-Expression $cmd
+                            $repairCMDs += $cmd.ToUpper()
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repairing Office Product $($product.DisplayName) with command: $($cmd)" -LogFilePath $LogFilePath
+                            $cmdLine = $env:COMSPEC
+                            $cmdArgs = "/c $($cmd)"
+                            StartProcess -execFilePath $cmdLine -execParams $cmdArgs -WaitForExit $true 
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repair process has completed..." -LogFilePath $LogFilePath
                         }
                     } else {
                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repair command could not be identified... Skipping Repair for this product." -LogFilePath $LogFilePath
@@ -724,12 +728,14 @@ In this example the primary Office product will be removed even if it is Click-T
             }#End foreach($product in $officeVersions)
         }#End If (($previousOfficeVersions) -and ($officeVersions) -and (($previousOfficeVersions).Count -gt ($officeVersions).Count))
     }#End If ($removeOffice)
-    if (($cleanupFileReferences)) {
+    if (($cleanupFileReferences) -and $($cleanupFileReferences).count -gt 0) {
         Write-Debug "Removing $(($cleanupFileReferences).Count) files retrieved during script run."
+        WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Cleaning $($cleanupFileReferences.count) temporary files..." -LogFilePath $LogFilePath
         $cleanupFileReferences | foreach-object { if ((Test-Path -Path $_ -EA 0)) { try { Remove-Item -path $_ -Force -ErrorAction 0 } catch {} } }
         Clear-Variable cleanupFileReferences -Scope Global -ErrorAction 0
         Clear-Variable cleanupFileReferences -Scope Local -ErrorAction 0
     }#End If (($cleanupFileReferences))
+    WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Remove-PreviousOfficeInstalls has completed..." -LogFilePath $LogFilePath
   }#End Process
 }#End Function
 
@@ -1840,10 +1846,10 @@ param(
                                     $primaryOfficeLanguage = GetClientCulture
                                     $repairCulture="culture=$($primaryOfficeLanguage)"
                                 }
-                                $repairCMD = $repairCMD -replace '^(.*?OfficeClickToRun\.exe[^\s]*).*',"`$1 $($repairSenario) $($repairPlatform) $($repairCulture) RepairType=QuickRepair DisplayLevel=False forceappshutdown=True"  #Remove all parameters and rebuild Command Line
+                                $repairCMD = $repairCMD -replace '^"?(.*?OfficeClickToRun\.exe)"?.*',"""`$1"" $($repairSenario) $($repairPlatform) $($repairCulture) RepairType=QuickRepair DisplayLevel=False forceappshutdown=True"  #Remove all parameters and rebuild Command Line
                             }  ElseIf (($modify) -match 'IntegratedOffice\.exe') {
                                 $repairCMD = $modify
-                                $repairCMD = $repairCMD -replace '^(.*?IntegratedOffice\.exe[^\s]*).*',"`$1 RUNMODE RERUNMODE modetorun repair"  #Remove all parameters and rebuild Command Line
+                                $repairCMD = $repairCMD -replace '^"?(.*?IntegratedOffice\.exe)"?.*',"""`$1"" RUNMODE RERUNMODE modetorun repair"  #Remove all parameters and rebuild Command Line
                             }
                         }
 
