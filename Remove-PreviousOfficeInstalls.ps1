@@ -672,15 +672,15 @@ In this example the primary Office product will be removed even if it is Click-T
                     switch -wildcard ($product.Version){
                         "11.*"{
                             WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                         }
                         "12.*"{
                             WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                         }
                         "14.*"{
                             WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                         }
                         "15.*"{
                             WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
@@ -689,9 +689,9 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
 
                             if(!$c2r2013Installed){
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                             } else {
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                             }
 
                         }
@@ -702,9 +702,9 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
 
                             if(!$c2r2016Installed){
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                             } else {
-                                $cmd = GetProductRepair -ProductName $($product.DisplayName) | Select-Object -ExpandProperty Repair
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
                             }
                         }
                     }
@@ -1753,6 +1753,9 @@ param(
     [string]$ProductName,
 
     [Parameter()]
+    [string]$Bitness,
+
+    [Parameter()]
     [string]$LogFilePath
 )
     $defaultDisplaySet = 'DisplayName','Name','Version','Repair'
@@ -1826,15 +1829,18 @@ param(
                                 }
                                 $repairPlatform = $repairCMD -replace '^.*?(platform=[^\s]*).*?|.*',"`$1"
                                 if (!($repairPlatform)) {
-                                    #Need to get Bitness Here.
-                                    $repairPlatform='platform=x86'
+                                    if ($Bitness -match '64') {
+                                        $repairPlatform='platform=x64'
+                                    } else {
+                                        $repairPlatform='platform=x86'
+                                    }
                                 }
                                 $repairCulture = $repairCMD -replace '^.*?(culture=[^\s]*).*?|.*',"`$1"
                                 if (!($repairCulture)) {
-                                    #Need to get Culture Here.
-                                    $repairCulture='culture=en-us'
+                                    $primaryOfficeLanguage = GetClientCulture
+                                    $repairCulture="culture=$($primaryOfficeLanguage)"
                                 }
-                                $repairCMD = $repairCMD -replace '^(.*?OfficeClickToRun\.exe[^\s]*).*',"`$1 $($repairSenario) $($repairPlatform) $($repairPlatform) RepairType=QuickRepair DisplayLevel=False forceappshutdown=True"  #Remove all parameters and rebuild Command Line
+                                $repairCMD = $repairCMD -replace '^(.*?OfficeClickToRun\.exe[^\s]*).*',"`$1 $($repairSenario) $($repairPlatform) $($repairCulture) RepairType=QuickRepair DisplayLevel=False forceappshutdown=True"  #Remove all parameters and rebuild Command Line
                             }  ElseIf (($modify) -match 'IntegratedOffice\.exe') {
                                 $repairCMD = $modify
                                 $repairCMD = $repairCMD -replace '^(.*?IntegratedOffice\.exe[^\s]*).*',"`$1 RUNMODE RERUNMODE modetorun repair"  #Remove all parameters and rebuild Command Line
