@@ -1,4 +1,5 @@
-﻿[CmdletBinding(SupportsShouldProcess=$true)]
+
+[CmdletBinding(SupportsShouldProcess=$true)]
 param(
 [Parameter(ValueFromPipelineByPropertyName=$true)]
 [bool]$RemoveClickToRunVersions = $false,
@@ -20,6 +21,9 @@ param(
 
 [Parameter(ValueFromPipelineByPropertyName=$true)]
 [bool]$Quiet = $true,
+
+[Parameter(ValueFromPipelineByPropertyName=$true)]
+[string[]]$ScriptSource,
 
 [Parameter()]
 [ValidateSet("AllOfficeProducts","MainOfficeProduct","Visio","Project")]
@@ -142,7 +146,7 @@ $validLanguages = @(
 "Wolof (Senegal)|wo-sn",
 "Yoruba (Nigeria)|yo-ng")
 
-Function Remove-PreviousOfficeInstalls{
+Function Remove-PreviousOfficeInstalls {
 <#
 .SYNOPSIS
 Automate the process to remove Office products.
@@ -175,6 +179,11 @@ the uninstall.
 .PARAMETER ProductsToRemove
 By default the value is AllOfficeProducts which will remove all Office products. Set this value
 to MainOfficeProduct, Visio, and/or Project to only remove the specified product.
+
+.PARAMETER ScriptSource
+By default the value is:
+https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/
+This location will be used to download any additional files that are needed for Script Operations.
 
 .EXAMPLE
 Remove-PreviousOfficeInstalls
@@ -214,6 +223,9 @@ In this example the primary Office product will be removed even if it is Click-T
     [bool]$Quiet = $true,
 
     [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [string[]]$ScriptSource,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
     [ValidateSet("AllOfficeProducts","MainOfficeProduct","Visio","Project")]
     [string[]]$ProductsToRemove = "AllOfficeProducts",
 
@@ -221,9 +233,16 @@ In this example the primary Office product will be removed even if it is Click-T
     [string]$LogFilePath
   )
 
+
   Process {
+    If (!($ScriptSource) -or $ScriptSource -like  '') {
+        $ScriptSource = @('https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/',
+			'https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/Feature-EnableRunFromGitHub/')
+    }
+    $ScriptSource = ($ScriptSource) -replace '(?<=^(?=https?://).+(?<!/))(/*)$','/' -replace '(?<=^(?!https?://).+(?<![\\]))([\\]*)$','\'
+
     $currentFileName = Get-CurrentFileName
-    Set-Alias -name LINENUM -value Get-CurrentLineNumber
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
     $c2rVBS = "OffScrubc2r.vbs"
     $03VBS = "OffScrub03.vbs"
@@ -232,16 +251,16 @@ In this example the primary Office product will be removed even if it is Click-T
     $15MSIVBS = "OffScrub_O15msi.vbs"
     $16MSIVBS = "OffScrub_O16msi.vbs"
 
-    $argList = ""
+    $argList = @(" /Bypass 1")
     $MainArgListProducts = @()
     $VisioArgListProducts = @()
     $ProjectArgListProducts = @()
 
-    $officeProducts = Get-OfficeVersion -ShowAllInstalledProducts | select *
+    $officeProducts = Get-OfficeVersion -ShowAllInstalledProducts | select * -ErrorAction 0 | Sort-Object { [Version]($($_.Version)) } -ErrorAction 0
 
     [bool]$isVisioC2R = $false
     [bool]$isProjectC2R = $false
-   
+
     if($ProductsToRemove -eq 'AllOfficeProducts'){
         $argListProducts += "CLIENTALL"
     } else {       
@@ -339,7 +358,7 @@ In this example the primary Office product will be removed even if it is Click-T
     Write-Host "Detecting Office installs..."
     WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Detecting Office installs..." -LogFilePath $LogFilePath
 
-    $officeVersions = Get-OfficeVersion -ShowAllInstalledProducts | select *
+    $officeVersions = Get-OfficeVersion -ShowAllInstalledProducts | select * -ErrorAction 0 | Sort-Object { [Version]($($_.Version)) } -ErrorAction 0
     $ActionFiles = @()
     
     $removeOffice = $true
@@ -411,13 +430,15 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
                         }
 
+                        if($ActionFile) { Get-FileReference -Fname $ActionFile -ScriptSource $ScriptSource }
+
                         try{
                              if($ActionFile -And (Test-Path -Path $ActionFile)){
                                 $MainOfficeProductDisplayName = $MainOfficeProduct.DisplayName
                                 Write-Host "`tRemoving "$MainOfficeProduct.DisplayName"..."
-                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing the MainOfficeProduct..." -LogFilePath $LogFilePath
                                 $cmdLine = """$ActionFile"" $MainOfficeProductName $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
+                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing the MainOfficeProduct $($MainOfficeProduct.DisplayName) (Version $($MainOfficeProduct.Version)) with command: $($cmd)..." -LogFilePath $LogFilePath
                                 Invoke-Expression $cmd
                             } else {
                                 throw "Required file missing: $ActionFile"
@@ -470,9 +491,12 @@ In this example the primary Office product will be removed even if it is Click-T
                             }
                         }
 
+                        if($ActionFile) { Get-FileReference -Fname $ActionFile -ScriptSource $ScriptSource }
+
                         if($ActionFile -And (Test-Path -Path $ActionFile)){
                             $cmdLine = """$ActionFile"" $VisioArgListProducts $argList"
                             $cmd = "cmd /c cscript //Nologo $cmdLine"
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing with command: $($cmd)..." -LogFilePath $LogFilePath
                             Invoke-Expression $cmd
                         }
 
@@ -522,9 +546,13 @@ In this example the primary Office product will be removed even if it is Click-T
                                     }
                                 }
                             }
+
+                        if($ActionFile) { Get-FileReference -Fname $ActionFile -ScriptSource $ScriptSource }
+
                         if($ActionFile -And (Test-Path -Path $ActionFile)){
                             $cmdLine = """$ActionFile"" $ProjectProductName $argList"
                             $cmd = "cmd /c cscript //Nologo $cmdLine"
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing with command: $($cmd)..." -LogFilePath $LogFilePath
                             Invoke-Expression $cmd
                         }
                     }
@@ -538,39 +566,55 @@ In this example the primary Office product will be removed even if it is Click-T
                 try{
                     switch -wildcard ($product.Version){
                         "11.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified..." -LogFilePath $LogFilePath
                             if(!$office03Removed){
                                 $ActionFile = "$scriptPath\$03VBS"
+                                Get-FileReference -Fname $03VBS -ScriptSource $ScriptSource
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
+                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing Office Version $($product.Version) with command: $($cmd)..." -LogFilePath $LogFilePath
                                 Invoke-Expression $cmd
                                 $office03Removed = $true
                             }
                         }
                         "12.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified..." -LogFilePath $LogFilePath
                             if(!$office07Removed){
                                 $ActionFile = "$scriptPath\$07VBS"
+                                Get-FileReference -Fname $07VBS -ScriptSource $ScriptSource
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
+                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing Office Version $($product.Version) with command: $($cmd)..." -LogFilePath $LogFilePath
                                 Invoke-Expression $cmd
                                 $office07Removed = $true
                             }
                         }
                         "14.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified..." -LogFilePath $LogFilePath
                             if(!$office10Removed){
                                 $ActionFile = "$scriptPath\$10VBS"
+                                Get-FileReference -Fname $10VBS -ScriptSource $ScriptSource
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
+                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing Office Version $($product.Version) with command: $($cmd)..." -LogFilePath $LogFilePath
                                 Invoke-Expression $cmd
                                 $office10Removed = $true
                             }
                         }
                         "15.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified..." -LogFilePath $LogFilePath
                             if(!$office15Removed){
+                                if($product.ClickToRun -eq $true){
+                                    $c2r2013Installed = $true
+                                }
+                                
                                 if(!$c2r2013Installed){
                                     $ActionFile = "$scriptPath\$15MSIVBS"
+                                    Get-FileReference -Fname $15MSIVBS -ScriptSource $ScriptSource
                                 } else {
                                     if($RemoveClickToRunVersions){
                                         $ActionFile = "$scriptPath\$c2rVBS"
+                                        Get-FileReference -Fname $c2rVBS -ScriptSource $ScriptSource
                                     } else {
                                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office 2013 cannot be removed if 2013 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs." -LogFilePath $LogFilePath
                                         throw "Office 2013 cannot be removed if 2013 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs."
@@ -579,11 +623,13 @@ In this example the primary Office product will be removed even if it is Click-T
 
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
+                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing Office Version $($product.Version) with command: $($cmd)..." -LogFilePath $LogFilePath
                                 Invoke-Expression $cmd
                                 $office15Removed = $true
                             }
                         }
                         "16.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified..." -LogFilePath $LogFilePath
                             if($Remove2016Installs){
                                 if($product.ClickToRun -eq $true){
                                     $c2r2016Installed = $true
@@ -591,9 +637,11 @@ In this example the primary Office product will be removed even if it is Click-T
 
                                 if(!$c2r2016Installed){
                                     $ActionFile = "$scriptPath\$16MSIVBS"
+                                    Get-FileReference -Fname $16MSIVBS -ScriptSource $ScriptSource
                                 } else {
                                     if($RemoveClickToRunVersions){
                                         $ActionFile = "$scriptPath\$c2rVBS"  
+                                        Get-FileReference -Fname $c2rVBS -ScriptSource $ScriptSource
                                     } else {
                                         WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office 2016 cannot be removed if 2016 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs." -LogFilePath $LogFilePath
                                         throw "Office 2016 cannot be removed if 2016 Click-To-Run is installed. Use the -RemoveClickToRunVersions parameter to remove Click-To-Run installs."
@@ -602,6 +650,7 @@ In this example the primary Office product will be removed even if it is Click-T
 
                                 $cmdLine = """$ActionFile"" CLIENTALL $argList"
                                 $cmd = "cmd /c cscript //Nologo $cmdLine"
+                                WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Removing Office Version $($product.Version) with command: $($cmd)..." -LogFilePath $LogFilePath
                                 Invoke-Expression $cmd
                                 $office16Removed = $true
                             }
@@ -610,9 +659,79 @@ In this example the primary Office product will be removed even if it is Click-T
                 } catch {}
             }
         }
-    }
-  }
-}
+        $previousOfficeVersions=$officeVersions
+        $officeVersions = Get-OfficeVersion -ShowAllInstalledProducts | select * -ErrorAction 0 | Sort-Object { [Version]($($_.Version)) } -ErrorAction 0
+        If (($previousOfficeVersions) -and ($officeVersions) -and (($previousOfficeVersions).Count -gt ($officeVersions).Count)) {
+            $repairCMDs = @()
+            Write-Host "Reviewing/Repairing remaining Office installs..."
+            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Reviewing/Repairing remaining Office installs..." -LogFilePath $LogFilePath
+
+            foreach($product in $officeVersions){
+                try{
+                    $cmd = $null
+                    switch -wildcard ($product.Version){
+                        "11.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                        }
+                        "12.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                        }
+                        "14.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                        }
+                        "15.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
+                            if($product.ClickToRun -eq $true){
+                                $c2r2013Installed = $true
+                            }
+
+                            if(!$c2r2013Installed){
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                            } else {
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                            }
+
+                        }
+                        "16.*"{
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Office Version $($product.Version) was identified as remaining..." -LogFilePath $LogFilePath
+                            if($product.ClickToRun -eq $true){
+                                $c2r2016Installed = $true
+                            }
+
+                            if(!$c2r2016Installed){
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                            } else {
+                                $cmd = GetProductRepair -ProductName $($product.DisplayName) -Bitness $($product.Bitness) | Select-Object -ExpandProperty Repair
+                            }
+                        }
+                    }
+
+                    if($cmd) {
+                        if ($repairCMDs -contains $cmd) {
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repair command has already been executed for a different product. Skipping Repair..." -LogFilePath $LogFilePath
+                            $repairCMDs += $cmd
+                        } else {
+                            WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repairing Office Product $($product.DisplayName) with command: $($cmd)..." -LogFilePath $LogFilePath
+                            Invoke-Expression $cmd
+                        }
+                    } else {
+                        WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "Repair command could not be identified... Skipping Repair for this product." -LogFilePath $LogFilePath
+                    }
+                } catch {}
+            }#End foreach($product in $officeVersions)
+        }#End If (($previousOfficeVersions) -and ($officeVersions) -and (($previousOfficeVersions).Count -gt ($officeVersions).Count))
+    }#End If ($removeOffice)
+    if (($cleanupFileReferences)) {
+        Write-Debug "Removing $(($cleanupFileReferences).Count) files retrieved during script run."
+        $cleanupFileReferences | foreach-object { if ((Test-Path -Path $_ -EA 0)) { try { Remove-Item -path $_ -Force -ErrorAction 0 } catch {} } }
+        Clear-Variable cleanupFileReferences -Scope Global -ErrorAction 0
+        Clear-Variable cleanupFileReferences -Scope Local -ErrorAction 0
+    }#End If (($cleanupFileReferences))
+  }#End Process
+}#End Function
 
 Function Remove-OfficeClickToRun {
 <#
@@ -656,7 +775,7 @@ Will uninstall Office Click-to-Run.
 
      Process{
         $currentFileName = Get-CurrentFileName
-        Set-Alias -name LINENUM -value Get-CurrentLineNumber 
+        Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False 
 
         $scriptRoot = GetScriptRoot
 
@@ -793,7 +912,7 @@ Function StartProcess {
 	)
 
     $currentFileName = Get-CurrentFileName
-    Set-Alias -name LINENUM -value Get-CurrentLineNumber 
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False 
 
     Try
     {
@@ -828,7 +947,7 @@ Function IsSupportedLanguage() {
         )
         
         $currentFileName = Get-CurrentFileName
-        Set-Alias -name LINENUM -value Get-CurrentLineNumber
+        Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
         $lang = $validLanguages | where {$_.ToString().ToUpper().EndsWith("|$Language".ToUpper())}
           
@@ -1249,24 +1368,26 @@ Function IsDotSourced() {
   if ($cmdLine -match '^\.\\') {
      $dotSourced = $false
   } else {
-     $dotSourced = ($cmdLine -match '^\.')
+     $dotSourced = ($cmdLine -match '^\.|^&[\{ ]+\.')
   }
 
   return $dotSourced
 }
 
 Function GetScriptRoot() {
- process {
-     [string]$scriptPath = "."
+    process {
+        [string]$scriptPath = "."
 
-     if ($PSScriptRoot) {
-       $scriptPath = $PSScriptRoot
-     } else {
-       $scriptPath = (Get-Item -Path ".\").FullName
-     }
+        if ($overrideScriptPath) {
+            $scriptPath = $PSScriptRoot
+        } elseif ($PSScriptRoot) {
+            $scriptPath = $PSScriptRoot
+        } else {
+            $scriptPath = (Get-Item -Path ".\").FullName
+        }
 
-     return $scriptPath
- }
+        return $scriptPath
+    }
 }
 
 function GetProductName {
@@ -1283,7 +1404,7 @@ param(
     $results = New-Object PSObject[] 0;
     
     $currentFileName = Get-CurrentFileName
-    Set-Alias -name LINENUM -value Get-CurrentLineNumber
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
 
     if($ProductName -eq 'MainOfficeProduct'){
         $MainOfficeProducts = @()
@@ -1365,7 +1486,7 @@ function Get-ODTOfficeProductLanguages {
 
     Begin {
         $defaultDisplaySet = 'DisplayName','Languages'
-        $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet(‘DefaultDisplayPropertySet’,[string[]]$defaultDisplaySet)
+        $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultDisplaySet)
         $PSStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
         $results = New-Object PSObject[] 0
     }
@@ -1571,7 +1692,25 @@ function Get-CurrentLineNumber {
 }
 
 function Get-CurrentFileName{
-    $MyInvocation.ScriptName.Substring($MyInvocation.ScriptName.LastIndexOf("\")+1)
+    $FName=($MyInvocation.ScriptName.Substring($MyInvocation.ScriptName.LastIndexOf("\")+1))
+    if (!($FName)) {
+        $FName='Remove-PreviousOfficeInstalls - Dynamic Mode'
+        $global:overrideScriptPath=Get-Location|Select-Object -ExpandProperty Path
+        if (!($ScriptSource) -or (($ScriptSource) -and ($ScriptSource -notmatch 'https?://'))) {
+            #Need to try and extract URL from Invocation Information
+            #$MyInvocation.MyCommand
+        }
+        try {
+            Set-Location -Path "$($env:temp)" -EA 1
+            $global:overrideScriptPath=Get-Location|Select-Object -ExpandProperty Path
+        } catch {
+            try {
+                Set-Location -Path "$($env:windir)\temp" -EA 1
+                $global:overrideScriptPath=Get-Location|Select-Object -ExpandProperty Path
+            } catch {}
+        }
+    }
+    return $FName
 }
 
 Function WriteToLogFile() {
@@ -1608,8 +1747,153 @@ Function WriteToLogFile() {
     }
 }
 
-$dotSourced = IsDotSourced -InvocationLine $MyInvocation.Line
+function GetProductRepair {
+param(
+    [Parameter()]
+    [string]$ProductName,
 
-if (!($dotSourced)) {
-   Remove-PreviousOfficeInstalls -RemoveClickToRunVersions $RemoveClickToRunVersions -Remove2016Installs $Remove2016Installs -Force $Force -KeepUserSettings $KeepUserSettings -KeepLync $KeepLync -NoReboot $NoReboot -ProductsToRemove $ProductsToRemove -LogFilePath $LogFilePath
+    [Parameter()]
+    [string]$Bitness,
+
+    [Parameter()]
+    [string]$LogFilePath
+)
+    $defaultDisplaySet = 'DisplayName','Name','Version','Repair'
+    $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultDisplaySet)
+    $PSStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
+    $results = New-Object PSObject[] 0;
+    
+    $currentFileName = Get-CurrentFileName
+    Set-Alias -name LINENUM -value Get-CurrentLineNumber -Force -WhatIf:$False -Confirm:$False
+
+    if($ProductName -eq 'MainOfficeProduct'){
+        $MainOfficeProducts = @()
+        $MainOfficeProducts = (Get-OfficeVersion)
+        if($MainOfficeProducts.GetType().Name -eq "Object[]"){
+            $primaryOfficeLanguage = GetClientCulture
+            $MainOfficeProduct = (Get-OfficeVersion) | ? {$_.DisplayName -match $primaryOfficeLanguage}
+            $ProductName = $MainOfficeProduct.DisplayName
+        } else {
+            $ProductName = $MainOfficeProducts.DisplayName
+        }
+    }
+    
+    #WriteToLogFile -LNumber $(LINENUM) -FName $currentFileName -ActionError "ProductName set to $ProductName" -LogFilePath $LogFilePath 
+        
+    $HKLM = [UInt32] "0x80000002"
+    $HKCR = [UInt32] "0x80000000"
+ 
+    $installKeys = 'SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+                   'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+                   
+
+    $regProv = Get-WmiObject -list "StdRegProv" -namespace root\default -ComputerName $env:COMPUTERNAME
+
+    foreach ($regKey in $installKeys) {
+        $keyList = New-Object System.Collections.ArrayList
+        $keys = $regProv.EnumKey($HKLM, $regKey)
+
+        foreach ($key in $keys.sNames) {
+            $path = Join-Path $regKey $key
+            $name = $regProv.GetStringValue($HKLM, $path, "DisplayName").sValue
+            $version = $regProv.GetStringValue($HKLM, $path, "DisplayVersion").sValue
+            $modify = $regProv.GetStringValue($HKLM, $path, "ModifyPath").sValue
+            $uninstall = $regProv.GetStringValue($HKLM, $path, "UninstallPath").sValue
+            
+            if($name){
+                if($name.ToLower() -match $ProductName.ToLower()){
+                    if($path -notmatch "{.{8}-.{4}-.{4}-.{4}-0000000FF1CE}"){
+                        if($name -match "Language Pack"){
+                            if($key.Split(".")[1] -ne $null){
+                                $regex = "^[^.]*"
+                                $string = $key -replace $regex, ""
+                                $prodName = $string.trim(".")
+                            }
+                        } else {
+                            if($key.Split(".")[1] -ne $null){
+                                $prodName = $key.Split(".")[1]
+                            } else {
+                                $prodName = $key
+                            }
+                        }
+                        $prodVersion = $version.Split(".")[0]
+                        $DisplayName = $name
+
+                        $repairCMD = $null
+                        if ($modify) {
+                            if (($modify) -match 'OfficeClickToRun\.exe') {
+                                $repairCMD = $modify
+                                $repairScenario = $repairCMD -replace '^.*?(scenario=[^\s]*).*?|.*',"`$1"
+                                if (!($repairScenario) -or ($repairScenario -notmatch '=repair')) {
+                                    $repairScenario='scenario=repair'
+                                }
+                                $repairPlatform = $repairCMD -replace '^.*?(platform=[^\s]*).*?|.*',"`$1"
+                                if (!($repairPlatform)) {
+                                    if ($Bitness -match '64') {
+                                        $repairPlatform='platform=x64'
+                                    } else {
+                                        $repairPlatform='platform=x86'
+                                    }
+                                }
+                                $repairCulture = $repairCMD -replace '^.*?(culture=[^\s]*).*?|.*',"`$1"
+                                if (!($repairCulture)) {
+                                    $primaryOfficeLanguage = GetClientCulture
+                                    $repairCulture="culture=$($primaryOfficeLanguage)"
+                                }
+                                $repairCMD = $repairCMD -replace '^(.*?OfficeClickToRun\.exe[^\s]*).*',"`$1 $($repairSenario) $($repairPlatform) $($repairCulture) RepairType=QuickRepair DisplayLevel=False forceappshutdown=True"  #Remove all parameters and rebuild Command Line
+                            }  ElseIf (($modify) -match 'IntegratedOffice\.exe') {
+                                $repairCMD = $modify
+                                $repairCMD = $repairCMD -replace '^(.*?IntegratedOffice\.exe[^\s]*).*',"`$1 RUNMODE RERUNMODE modetorun repair"  #Remove all parameters and rebuild Command Line
+                            }
+                        }
+
+                        $object = New-Object PSObject -Property @{DisplayName = $DisplayName; Name = $prodName; Version = $prodVersion; Repair = $repairCMD; Modify = $modify; Uninstall = $uninstall }
+                        $object | Add-Member MemberSet PSStandardMembers $PSStandardMembers
+                        $results += $object
+                    }
+                }
+            }
+        }
+    }
+
+    return $Results
+
+}
+
+function Get-FileReference(){
+    param( 
+        [Parameter(Mandatory=$true)]
+        [string]$FName,
+        [Parameter(Mandatory=$true)]
+        [string[]]$ScriptSource
+    )
+
+    $fLocalName = $(GetScriptRoot)+'\'+$FName
+    try{
+        ForEach ($sSource in $ScriptSource) {
+            If (!(Test-Path -Path $fLocalName -EA 0)) {
+                IF (!($cleanupFileReferences)) { $global:cleanupFileReferences = @() }
+                IF ($sSource -match '^https?://') { 
+                    try {
+                        (new-object Net.WebClient).DownloadFile("$($sSource+$FName)",$fLocalName)
+                        $global:cleanupFileReferences += $fLocalName
+                        Write-Verbose "Download succeeded for $($sSource+$FName)"
+                    } catch { Write-Verbose "Download failed for $($sSource+$FName)" } 
+                } ElseIf ((Test-Path -Path "$($sSource)")) { 
+                    try {
+                        Copy-Item -Path "$($sSource+$FName)" -Destination $fLocalName -Force -EA 1
+                        $global:cleanupFileReferences += $fLocalName
+                        Write-Verbose "Copy succeeded for $($sSource+$FName)"
+                    } catch { Write-Verbose "Copy failed for $($sSource+$FName)" } 
+                }
+            }
+        }
+    } catch { Write-Error "Something bad happened retrieving $($FName)" -ErrorAction Stop }
+}
+
+$dotSourced = IsDotSourced -InvocationLine $MyInvocation.Line
+$currentFileName = Get-CurrentFileName
+
+if (!($dotSourced) -and ($currentFileName) -and !($currentFileName -like '*Dynamic Mode*')) {
+    Remove-PreviousOfficeInstalls -RemoveClickToRunVersions $RemoveClickToRunVersions -Remove2016Installs $Remove2016Installs -Force $Force -KeepUserSettings $KeepUserSettings -KeepLync $KeepLync -NoReboot $NoReboot -ProductsToRemove $ProductsToRemove -LogFilePath $LogFilePath -ScriptSource $ScriptSource
 }
