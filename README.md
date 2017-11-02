@@ -25,25 +25,17 @@ More information can be found at: https://blogs.technet.microsoft.com/odsupport/
 
 1. Open a PowerShell console.
 
-		From the Run dialog type PowerShell 
+	From the Run dialog type PowerShell 
 		
-2. Change directory to the location where the PowerShell Script is saved.
+2. Run this command to download and perform the uninstallation.
 
-		Example: cd C:\PowerShellScripts
-		
-3. Dot-Source the Remove-PreviousOfficeInstalls function into your current session.
+	Example: (new-object Net.WebClient).DownloadString('https://raw.githubusercontent.com/DarrenWhite99/Remove-PreviousOfficeInstalls/EnableRunFromGitHub-v1/Remove-PreviousOfficeInstalls.ps1') | iex
 
-		Type . .\Remove-PreviousOfficeInstalls.ps1
-		
-		By including the additional period before the relative script path you are 'Dot-Sourcing' 
-		the PowerShell function in the script into your PowerShell session which will allow you to 
-		run the function from the console.
+2. Run this command to perform the uninstallation. Steps 2 and 3 can be combined into a single command line.
 
-3. Run the function.
+	Remove-PreviousOfficeInstalls		
 
-		Type  Remove-PreviousOfficeInstalls
-		
-		The version of Office will be detected automatically and the appropriate Offscrub file will be used to remove any Office products. If Office is not detected on the client the script will notify the admin and stop running.
+	The version of Office will be detected automatically and the appropriate Offscrub file will be used to remove any Office products. If Office is not detected on the client the script will notify the admin and stop running.
 			
 
 	
